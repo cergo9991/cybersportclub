@@ -1,0 +1,139 @@
+﻿{% extends "base.html" %}
+{% block title %}Киберспортивный клуб · Игрок{% endblock %}
+{% block content %}
+<div class="bg-shape shape-a"></div>
+<div class="bg-shape shape-b"></div>
+
+<header class="topbar">
+    <div class="brand">CyberSport Club · Игрок</div>
+    <nav class="menu">
+        <a href="/">Главная</a>
+        <a href="/player">Игрок</a>
+        <a href="/admin">Админ</a>
+    </nav>
+    <div class="userbox">
+        <span class="user-chip">{{ user.username }} · Баланс: {{ user.balance }}</span>
+        <form method="post" action="/web/logout"><button class="ghost-btn" type="submit">Выйти</button></form>
+    </div>
+</header>
+
+<main class="layout">
+    <section class="hero">
+        <p class="kicker">Личный кабинет игрока</p>
+        <h1>Турниры, заявки и аренда ПК</h1>
+        <p class="lead">Свободно ПК на ближайший час: <strong>{{ free_count }}</strong></p>
+    </section>
+
+    {% if flash %}
+    <section class="flash flash-{{ flash.level }}">{{ flash.message }}</section>
+    {% endif %}
+
+    <section class="grid two">
+        <article class="card">
+            <h2>D4. Подача заявки на турнир</h2>
+            <form method="post" action="/web/player/applications" class="stack">
+                <label>Турнир
+                    <select name="tournament_id" required>
+                        {% for tournament in tournaments %}
+                        <option value="{{ tournament.id }}">{{ tournament.name }} · Взнос {{ tournament.entry_fee }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>Команда (если нет — будет создана)
+                    <input type="text" name="team_name" minlength="2" maxlength="64" placeholder="Например: NightOwls">
+                </label>
+                <button class="primary-btn" type="submit">Подать заявку</button>
+            </form>
+            <h3>Мои заявки</h3>
+            <ul class="list">
+                {% for application in user_applications %}
+                <li>
+                    {{ application.user_name }} · турнир #{{ application.tournament_id }} · статус: {{ application.status }}
+                    {% if application.team_name %} · команда: {{ application.team_name }}{% endif %}
+                    {% if application.assigned_arena_id %} · зал: {{ application.assigned_arena_id }}{% endif %}
+                    · взнос: {{ application.entry_fee_charged }}
+                </li>
+                {% else %}
+                <li class="muted">Заявок пока нет.</li>
+                {% endfor %}
+            </ul>
+        </article>
+
+        <article class="card">
+            <h2>Ближайшие турниры</h2>
+            <div class="tour-grid">
+                {% for tournament in tournaments %}
+                <article class="tour-card">
+                    <h3>{{ tournament.name }}</h3>
+                    <p>{{ tournament.game_type }}</p>
+                    <p class="muted">Категория: {{ tournament.category_name }}</p>
+                    <p class="muted">Тип: {% if tournament.tournament_type == "official" %}официальный{% else %}любительский{% endif %}</p>
+                    <p class="muted">Взнос: {{ tournament.entry_fee }}</p>
+                    <p class="muted">Призовой: {{ tournament.prize_pool }}</p>
+                    <p class="muted">Старт: {{ tournament.start_datetime or tournament.start_date }}</p>
+                </article>
+                {% else %}
+                <p class="muted">Турниров пока нет.</p>
+                {% endfor %}
+            </div>
+        </article>
+    </section>
+
+    <section class="card">
+        <h2>Аренда ПК</h2>
+        <form method="post" action="/web/bookings" class="stack">
+            <label>ПК
+                <select name="arena_id" required>
+                    {% for arena in arenas %}
+                    <option value="{{ arena.id }}">#{{ arena.number }} · {{ arena.type }} · {{ arena.hall_name }} · {{ arena.price_per_hour }}/ч</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>Начало
+                <input type="datetime-local" class="booking-datetime" name="start_time" min="{{ booking_min_datetime }}" required>
+            </label>
+            <label>Окончание
+                <input type="datetime-local" class="booking-datetime" name="end_time" min="{{ booking_min_datetime }}" required>
+            </label>
+            <label class="checkbox"><input type="checkbox" name="is_tournament_participant">Участник турнира (льготная стратегия)</label>
+            <button class="primary-btn" type="submit">Забронировать ПК</button>
+        </form>
+        <h3>Мои брони</h3>
+        <ul class="list">
+            {% for booking in bookings %}
+            <li>
+                Бронь #{{ booking.id }} · ПК {{ booking.arena_id }} · {{ booking.start_time }} - {{ booking.end_time }} ·
+                {{ booking.total_cost }} · {% if booking.is_paid %}оплачено{% else %}ожидает оплаты{% endif %}
+                {% if not booking.is_paid %}
+                <form method="post" action="/web/bookings/{{ booking.id }}/pay" style="display:inline-block;margin-left:8px;">
+                    <button class="ghost-btn" type="submit">Оплатить</button>
+                </form>
+                {% endif %}
+            </li>
+            {% else %}
+            <li class="muted">Броней пока нет.</li>
+            {% endfor %}
+        </ul>
+    </section>
+</main>
+
+<script>
+(function () {
+    const fields = document.querySelectorAll('.booking-datetime');
+    if (!fields.length) return;
+    const now = new Date();
+    now.setSeconds(0, 0);
+    const toLocalIso = (value) => {
+        const offset = value.getTimezoneOffset() * 60000;
+        return new Date(value.getTime() - offset).toISOString().slice(0, 16);
+    };
+    const minValue = toLocalIso(now);
+    fields.forEach((field) => {
+        field.min = minValue;
+        if (!field.value) {
+            field.value = minValue;
+        }
+    });
+})();
+</script>
+{% endblock %}

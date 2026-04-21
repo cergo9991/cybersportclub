@@ -1,0 +1,254 @@
+﻿{% extends "base.html" %}
+{% block title %}Киберспортивный клуб · Администратор{% endblock %}
+{% block content %}
+<div class="bg-shape shape-a"></div>
+<div class="bg-shape shape-b"></div>
+
+<header class="topbar">
+    <div class="brand">CyberSport Club · Админ</div>
+    <nav class="menu">
+        <a href="/">Главная</a>
+        <a href="/player">Игрок</a>
+        <a href="/admin">Админ</a>
+    </nav>
+    <div class="userbox">
+        <span class="user-chip">{{ user.username }} · Администратор</span>
+        <form method="post" action="/web/logout"><button class="ghost-btn" type="submit">Выйти</button></form>
+    </div>
+</header>
+
+<main class="layout">
+    <section class="hero">
+        <p class="kicker">Панель администратора</p>
+        <h1>D2-D5: турниры, залы, заявки, баланс и архив</h1>
+        <p class="lead">Всего ПК: <strong>{{ arenas|length }}</strong> · Свободно сейчас: <strong>{{ free_count }}</strong></p>
+    </section>
+
+    {% if flash %}
+    <section class="flash flash-{{ flash.level }}">{{ flash.message }}</section>
+    {% endif %}
+
+    <section class="grid two">
+        <article class="card">
+            <h2>D2. Создание турниров</h2>
+            <form method="post" action="/web/admin/tournaments" class="stack">
+                <label>Название турнира<input type="text" name="name" required minlength="3"></label>
+                <label>Дисциплина<input type="text" name="game_type" required></label>
+                <label>Категория игры
+                    <select name="category_name" required>
+                        {% for category in categories %}
+                        <option value="{{ category.name }}">{{ category.name }}</option>
+                        {% endfor %}
+                        <option value="Other">Other</option>
+                    </select>
+                </label>
+                <label>Тип турнира
+                    <select name="tournament_type" required>
+                        <option value="amateur">Любительский</option>
+                        <option value="official">Официальный</option>
+                    </select>
+                </label>
+                <label>Взнос за регистрацию<input type="number" min="0" step="0.01" name="entry_fee" value="0.00" required></label>
+                <label>Призовой фонд<input type="number" min="0" step="0.01" name="prize_pool" value="0.00" required></label>
+                <label>Дата и время старта<input type="datetime-local" name="start_datetime" min="{{ booking_min_datetime }}" required></label>
+                <button class="primary-btn" type="submit">Создать турнир</button>
+            </form>
+        </article>
+
+        <article class="card">
+            <h2>Турниры</h2>
+            <div class="tour-grid">
+                {% for tournament in tournaments %}
+                <article class="tour-card">
+                    <h3>{{ tournament.name }}</h3>
+                    <p>{{ tournament.game_type }}</p>
+                    <p class="muted">Статус: {{ tournament.status }}</p>
+                    <p class="muted">Категория: {{ tournament.category_name }}</p>
+                    <p class="muted">Взнос: {{ tournament.entry_fee }}</p>
+                    <p class="muted">Призовой фонд: {{ tournament.prize_pool }}</p>
+                    <p class="muted">Старт: {{ tournament.start_datetime or tournament.start_date }}</p>
+                    <form method="post" action="/web/admin/tournaments/{{ tournament.id }}/delete" style="margin-top:8px;">
+                        <button class="ghost-btn" type="submit">Удалить турнир</button>
+                    </form>
+                </article>
+                {% else %}
+                <p class="muted">Турниров пока нет.</p>
+                {% endfor %}
+            </div>
+        </article>
+    </section>
+
+    <section class="card">
+        <h2>Закрытие турниров и выплаты победителям</h2>
+        <div class="stack">
+            {% for tournament in tournaments %}
+            <form method="post" action="/web/admin/tournaments/{{ tournament.id }}/close" class="stack tour-card">
+                <p>{{ tournament.name }} · статус: {{ tournament.status }}</p>
+                <label>Результат
+                    <input type="text" name="result_text" required placeholder="Например: Финал сыгран, победа 2:0">
+                </label>
+                <label>Победители (игроки)
+                    <select name="winner_user_ids" multiple size="4" {% if tournament.status == 'closed' %}disabled{% endif %}>
+                        {% for application in participants_by_tournament.get(tournament.id, []) %}
+                        <option value="{{ application.user_id }}">{{ application.user_name }}{% if application.team_name %} · {{ application.team_name }}{% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <button class="primary-btn" type="submit" {% if tournament.status == 'closed' %}disabled{% endif %}>Закрыть турнир</button>
+            </form>
+            {% else %}
+            <p class="muted">Нет турниров для закрытия.</p>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="card">
+        <h2>Управление игровыми ПК</h2>
+        <form method="post" action="/web/admin/arenas" class="stack">
+            <label>Номер ПК<input type="number" min="1" name="number" required></label>
+            <label>Тип ПК<input type="text" name="arena_type" required placeholder="STREAM-PC / STANDARD-PC / VIP-PC / PRO-PC"></label>
+            <label>Цена за час<input type="number" min="1" step="0.01" name="price_per_hour" required></label>
+            <button class="primary-btn" type="submit">Добавить ПК</button>
+        </form>
+        <div class="stack">
+            {% for arena in arenas %}
+            <form method="post" action="/web/admin/arenas/{{ arena.id }}/update" class="stack tour-card">
+                <label>Номер ПК<input type="number" name="number" value="{{ arena.number }}" min="1" required></label>
+                <label>Тип<input type="text" name="arena_type" value="{{ arena.type }}" required></label>
+                <label>Зал/комната<input type="text" value="{{ arena.hall_name }}" disabled></label>
+                <label>Цена за час<input type="number" name="price_per_hour" value="{{ arena.price_per_hour }}" min="1" step="0.01" required></label>
+                <div class="split">
+                    <button class="ghost-btn" type="submit">Обновить ПК</button>
+                    <button class="ghost-btn" formaction="/web/admin/arenas/{{ arena.id }}/delete" formmethod="post" type="submit">Удалить ПК</button>
+                </div>
+            </form>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="grid two">
+        <article class="card">
+            <h2>Баланс пользователей</h2>
+            <div class="stack">
+                {% for item in users %}
+                <form method="post" action="/web/admin/users/{{ item.id }}/balance" class="stack tour-card">
+                    <p>{{ item.username }} · {{ item.email }}</p>
+                    <label>Баланс
+                        <input type="number" step="0.01" min="0" name="new_balance" value="{{ item.balance }}" required>
+                    </label>
+                    <button class="ghost-btn" type="submit">Обновить баланс</button>
+                </form>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="card">
+            <h2>D3. Распределение компьютерных залов</h2>
+            <form method="post" action="/web/admin/assignments" class="stack">
+                <label>Турнир
+                    <select name="tournament_id" required>
+                        {% for tournament in tournaments %}
+                        <option value="{{ tournament.id }}">{{ tournament.name }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>Зал / ПК
+                    <select name="arena_id" required>
+                        {% for arena in arenas %}
+                        <option value="{{ arena.id }}">#{{ arena.number }} · {{ arena.type }} · {{ arena.hall_name }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <button class="primary-btn" type="submit">Назначить зал</button>
+            </form>
+            <ul class="list">
+                {% for item in hall_assignments %}
+                <li>
+                    {{ tournament_map[item.tournament_id].name if item.tournament_id in tournament_map else ("Турнир #" ~ item.tournament_id) }}
+                    ->
+                    {{ arena_map[item.arena_id].number if item.arena_id in arena_map else ("ПК #" ~ item.arena_id) }}
+                </li>
+                {% else %}
+                <li class="muted">Назначений пока нет.</li>
+                {% endfor %}
+            </ul>
+        </article>
+    </section>
+
+    <section class="card">
+        <h2>D4. Отслеживание заявок</h2>
+        <div class="stack">
+            {% for application in pending_applications %}
+            <form method="post" action="/web/admin/applications/{{ application.id }}/review" class="stack tour-card">
+                <p>
+                    Заявка #{{ application.id }} · игрок: {{ application.user_name }}
+                    {% if application.team_name %} · команда: {{ application.team_name }}{% endif %}
+                    · турнир: {{ application.tournament_id }} · взнос: {{ application.entry_fee_charged }}
+                </p>
+                <label>Зал при одобрении
+                    <select name="assigned_arena_id">
+                        <option value="">Без назначения</option>
+                        {% for arena in arenas %}
+                        <option value="{{ arena.id }}">#{{ arena.number }} · {{ arena.type }} · {{ arena.hall_name }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>Комментарий<input type="text" name="admin_comment"></label>
+                <div class="split">
+                    <button class="primary-btn" type="submit" name="action" value="approve">Одобрить</button>
+                    <button class="ghost-btn" type="submit" name="action" value="reject">Отклонить</button>
+                </div>
+            </form>
+            {% else %}
+            <p class="muted">Новых заявок нет.</p>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="card">
+        <h2>D5. Архив и результаты</h2>
+        <form method="post" action="/web/admin/archive-result" class="stack">
+            <label>Турнир
+                <select name="tournament_id" required>
+                    {% for tournament in tournaments %}
+                    <option value="{{ tournament.id }}">{{ tournament.name }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>Команда-победитель
+                <select name="winner_team_id">
+                    <option value="">Не указывать</option>
+                    {% for team in teams %}
+                    <option value="{{ team.id }}">{{ team.name }}{% if team.member_count %} · участников {{ team.member_count }}{% endif %}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>Результат/событие<input type="text" name="result_text" required></label>
+            <button class="primary-btn" type="submit">Добавить в архив</button>
+        </form>
+
+        <h3>Лента архива (редактируемая)</h3>
+        <div class="stack">
+            {% for event in archive_events %}
+            <form method="post" action="/web/admin/archive-events/{{ event.id }}/edit" class="stack tour-card">
+                <label>Тип события<input type="text" name="event_type" value="{{ event.event_type }}" required></label>
+                <label>Описание<input type="text" name="details" value="{{ event.details }}" required></label>
+                <p class="muted">Создано: {{ event.created_at }}</p>
+                <button class="ghost-btn" type="submit">Сохранить изменения</button>
+            </form>
+            {% else %}
+            <p class="muted">Архив пока пуст.</p>
+            {% endfor %}
+        </div>
+
+        <h3>Архив турниров и результатов</h3>
+        <ul class="list">
+            {% for item in tournament_archive %}
+            <li>Турнир #{{ item.tournament_id }} · {{ item.result_summary }}{% if item.winner_name %} · Победитель: {{ item.winner_name }}{% endif %}</li>
+            {% else %}
+            <li class="muted">Результатов турниров пока нет.</li>
+            {% endfor %}
+        </ul>
+    </section>
+</main>
+{% endblock %}

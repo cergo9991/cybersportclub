@@ -1,0 +1,79 @@
+﻿{% extends "base.html" %}
+{% block title %}Киберспортивный клуб · Главная{% endblock %}
+{% block content %}
+<div class="bg-shape shape-a"></div>
+<div class="bg-shape shape-b"></div>
+
+<header class="topbar">
+    <div class="brand">CyberSport Club</div>
+    <nav class="menu">
+        <a href="/">Главная</a>
+        <a href="/player">Игрок</a>
+        <a href="/admin">Админ</a>
+    </nav>
+    <div class="userbox">
+        {% if user %}
+        <span class="user-chip">{{ user.username }} · {% if is_admin %}Администратор{% else %}Игрок{% endif %} · Баланс: {{ user.balance }}</span>
+        <form method="post" action="/web/logout"><button class="ghost-btn" type="submit">Выйти</button></form>
+        {% else %}
+        <span class="user-chip muted">Гость</span>
+        {% endif %}
+    </div>
+</header>
+
+<main class="layout">
+    <section class="hero">
+        <p class="kicker">Система клуба</p>
+        <h1>Регистрация игроков, турниры, заявки и архив событий</h1>
+        <p class="lead">Свободно ПК на ближайший час: <strong>{{ free_count }}</strong></p>
+        <div class="split">
+            <a class="primary-btn center-link" href="/player">Страница игрока</a>
+            <a class="ghost-btn center-link" href="/admin">Панель администратора</a>
+        </div>
+    </section>
+
+    {% if flash %}
+    <section class="flash flash-{{ flash.level }}">{{ flash.message }}</section>
+    {% endif %}
+
+    <section class="grid two">
+        <article class="card">
+            <h2>Регистрация игрока</h2>
+            <form method="post" action="/web/register" class="stack">
+                <label>Username<input type="text" name="username" required minlength="3"></label>
+                <label>Email<input type="email" name="email" required></label>
+                <label>Пароль<input type="password" name="password" required minlength="6"></label>
+                <button class="primary-btn" type="submit">Зарегистрироваться</button>
+            </form>
+        </article>
+        <article class="card">
+            <h2>Вход в систему</h2>
+            <form method="post" action="/web/login" class="stack">
+                <label>Email<input type="email" name="email" required></label>
+                <label>Пароль<input type="password" name="password" required></label>
+                <button class="primary-btn" type="submit">Войти</button>
+            </form>
+            <p class="muted">Админ по умолчанию: <code>admin@cyberclub.com</code> / <code>admin123</code></p>
+        </article>
+    </section>
+
+    <section class="card">
+        <h2>Ближайшие турниры</h2>
+        <div class="tour-grid">
+            {% for tournament in tournaments %}
+            <article class="tour-card">
+                <h3>{{ tournament.name }}</h3>
+                <p>{{ tournament.game_type }}</p>
+                <p class="muted">Категория: {{ tournament.category_name }}</p>
+                <p class="muted">Тип: {% if tournament.tournament_type == "official" %}официальный{% else %}любительский{% endif %}</p>
+                <p class="muted">Взнос: {{ tournament.entry_fee }}</p>
+                <p class="muted">Призовой: {% if tournament.has_prize %}{{ tournament.prize_pool }}{% else %}без призовых{% endif %}</p>
+                <p class="muted">Старт: {{ tournament.start_datetime or tournament.start_date }}</p>
+            </article>
+            {% else %}
+            <p class="muted">Турниров пока нет.</p>
+            {% endfor %}
+        </div>
+    </section>
+</main>
+{% endblock %}
